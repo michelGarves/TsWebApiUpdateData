@@ -1,0 +1,18 @@
+<%- include("_header") -%>
+
+<h1>Mettre à jour la Table des Organismes Destinataires</h1>
+</br>
+
+<!--<a href="/confirmUpdate"><button type ="button" class="btn btn-outline-primary btn-lg">Mettre à jour</button></a>-->
+
+<form action = "/loadFile" method = "post"  enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="file">Fichier CSV à charger</label>
+        <input type="file" class="form-control-file" id="file" name="file" accept=".csv">
+    </div>
+      <button>Envoyer</button>
+</form>
+
+
+
+<%- include("_footer") -%>

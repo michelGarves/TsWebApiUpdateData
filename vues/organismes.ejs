@@ -1,0 +1,56 @@
+﻿<%- include("_header") -%>
+
+<h3>Tables des Organismes</h3>
+<div class="table-wrapper-scroll-y my-custom-scrollbar" style="height: 700px;">
+<table id="listeOrg" class="table table-bordered table-striped mb-0" >
+    <thead>
+        <tr>
+            <th scope="col">ID_EXT_ORGANISME</th>
+            <th scope="col">ID_WRK_ADRESSE</th>
+            <th scope="col">ID_TS_TYPE_ORGANISME</th>
+            <th scope="col">REGIME_CODE</th>
+            <th scope="col">CAISSE_GESTIONNAIRE_CODE</th>
+            <th scope="col">CENTRE_GESTIONNAIRE_CODE</th>
+            <th scope="col">ORGANISME_LIBELLE</th>
+            <th scope="col">ORGANISME_DEST_CODE</th>
+            <th scope="col">CENTRE_INFO_CODE</th>
+            <th scope="col">ROUTAGE_CODE</th>
+            <th scope="col">NUM_ORGANISME</th>
+            <th scope="col">DOMAINE</th>
+            <th scope="col">INDICATEUR_TRAITEMENT_AMC</th>
+            <th scope="col">ID_HOTE_GESTION</th>
+            <th scope="col">ISACTIVE</th>
+            <th scope="col">ISENABLE</th>
+            <th scope="col">CREATEDDATE</th>
+            <th scope="col">UPDATEDDATE</th>
+        </tr>
+    </thead>
+    <tbody style="height: 700px;overflow: auto;">
+        <%
+        for(let org of organismes){ %>
+            <tr>
+                <th><%= org["ID_EXT_ORGANISME"] %></th>
+                <th><%= org["ID_WRK_ADRESSE"] %></th>
+                <th><%= org["ID_TS_TYPE_ORGANISME"] %></th>
+                <th scope="rowgroup"><%= org["REGIME_CODE"] %></th>
+                <th scope="rowgroup"><%= org["CAISSE_GESTIONNAIRE_CODE"] %></th>
+                <th><%= org["CENTRE_GESTIONNAIRE_CODE"] %></th>
+                <th><%= org["ORGANISME_LIBELLE"] %></th>
+                <th scope="rowgroup"><%= org["ORGANISME_DEST_CODE"] %></th>
+                <th><%= org["CENTRE_INFO_CODE"] %></th>
+                <th><%= org["ROUTAGE_CODE"] %></th>
+                <th><%= org["NUM_ORGANISME"] %></th>
+                <th><%= org["DOMAINE"] %></th>
+                <th><%= org["INDICATEUR_TRAITEMENT_AMC"] %></th>
+                <th><%= org["ID_HOTE_GESTION"] %></th>
+                <th><%= org["ISACTIVE"] %></th>
+                <th><%= org["ISENABLE"] %></th>
+                <th><%= org["CREATEDDATE"] %></th>
+                <th><%= org["UPDATEDDATE"] %></th>
+            </tr>
+             <% } %>
+</tbody>
+</table>
+</div>
+       
+<%- include("_footer") -%>

@@ -1,0 +1,11 @@
+﻿<%- include("_header") -%>
+
+
+<h3>Le fichier <%= fileName %> a bien été chargé, souhaitez-vous l'importer ? </h3>
+
+<form method="post" action="/import">
+    <input type="text" name="commentaire" id="commentaire" placeholder="Comentaire Version">
+    <button>Importer</button></form>
+<a href="/cancelImport" value="cancelImport"><button>Annuler</button></a>
+</br>
+<%- include("_footer") -%>
