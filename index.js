@@ -4,8 +4,8 @@ const fs = require('fs');
 const app = express()
 const path = require("path");
 const bodyParser = require('body-parser');
-const csv = require("csvtojson")
 const upload = require("express-fileupload");
+const { parseString } = require('@fast-csv/parse');
 
 
 
@@ -62,8 +62,10 @@ app.post("/loadFile", (req, res, next) => {
 
 app.get("/cancelImport", (req, res, next) => {
    
-  
-  fs.unlinkSync(`${__dirname}\\ext_data\\depot\\centrepayeur-export.csv`);
+  var depositFiles = fs.readdirSync(__dirname + "\\ext_data\\depot");
+  var depositFile = depositFiles[0];
+
+  fs.unlinkSync(`${__dirname}\\ext_data\\depot\\${depositFile}`);
   
  res.render('index', {'cancel' : "Votre import a bien été annulé"});
  
@@ -98,7 +100,7 @@ app.post("/import", (req, res, next) => {
     
     json.forEach(e => {
       try{
-        importExt(e, req.body.commentaire, function(err){
+        importExt(e, req.body.commentaire, depositFile, function(err){
           if(err) throw err;
         })
       }
@@ -136,20 +138,10 @@ app.post("/import", (req, res, next) => {
 });
  
 
-app.get("/showTable", (req, res, next) => {
-
- 
-
-  db.query("SELECT * FROM usd_organisme", function(err, rows, fields){
-
-  res.render("organismes", {'organismes' : rows});
-
-});
-});
 
 
-app.listen(3000, () => {     
-  console.log("Serveur lancé (http://localhost:3000/) ! ")
+app.listen(8000, () => {     
+  console.log("Serveur lancé (http://localhost:8000/) ! ")
 });
 
 //Fonction utilisée afin de trier un fichier json par ordre alphabétique selon la clé choisie
@@ -236,23 +228,30 @@ return json;
 }
 
 //Effectue l'insert dans la table ext_organisme en prenant en paramètre un objet json, un commentaire pour la version
-function importExt(element, commentaire ){
+function importExt(element, commentaire, nomFichier ){
   var laDate = new Date();
   var sqlDate = laDate.getFullYear() +"-"+ parseInt(laDate.getMonth()+1) + "-" + laDate.getDate() + " " + laDate.getHours() + "-" + laDate.getMinutes() + "-" + laDate.getSeconds();
   var columns = [`SOURCE_IMPORT`, `VERSION_IMPORT`, `DATE_IMPORT`, `REGIME_CODE`,
   `REGIME_DESCR`, `CAISSE_GESTIONNAIRE_CODE`, `CENTRE_GESTIONNAIRE_CODE`,
   `ORGANISME_LIBELLE`, `ORGANISME_DEST_CODE`, `CENTRE_INFO_CODE`, 
   `ADRESSE_1`, `ADRESSE_2`, `COMMUNE`, `CODE_POSTAL`, `CEDEX`, `TELEPHONE`, `FAX`];
-  let     SOURCE_IMPORT = "centrepayeur-export.csv",
+
+  //REGIME_CODE : string -> length === 2
+  //CAISSE_GESTIONNAIRE_CODE : string -> length === 3
+  //CENTRE_GESTIONNAIRE_CODE :  string -> length === 4
+  //OGRANISME_DEST_CODE : string -> length === 3
+  //CENTRE_INFO_CODE : string -> length === 3
+
+  let     SOURCE_IMPORT = nomFichier,
               VERSION_IMPORT = commentaire,
               DATE_IMPORT = sqlDate ,
-              REGIME_CODE = element['"code régime"'] ,
+              REGIME_CODE = format(element['"code régime"'], 2) ,
               REGIME_DESCR = element['"régime"'] ,
-              CAISSE_GESTIONNAIRE_CODE = element['"caisse gestionnaire"'] ,
-              CENTRE_GESTIONNAIRE_CODE = element['"centre gestionnaire"'] ,
+              CAISSE_GESTIONNAIRE_CODE = format(element['"caisse gestionnaire"'], 3) ,
+              CENTRE_GESTIONNAIRE_CODE = format(element['"centre gestionnaire"'], 4) ,
               ORGANISME_LIBELLE = element['"libellé"'] ,
-              ORGANISME_DEST_CODE = element['"organisme destinataire"'] ,
-              CENTRE_INFO_CODE = element['"code centre informatique"'] ,
+              ORGANISME_DEST_CODE = format(element['"organisme destinataire"'], 3) ,
+              CENTRE_INFO_CODE = format(element['"code centre informatique"'], 3) ,
               ADRESSE_1 = element['"adresse 1"'] ,
               ADRESSE_2 = element['"adresse 2"'],
               COMMUNE = element['"commune"'],
@@ -265,8 +264,8 @@ function importExt(element, commentaire ){
             'INSERT INTO ext_organisme (' + columns + ') VALUES (';
           
           insertStatement +='" ' +
-                    SOURCE_IMPORT + '" , "' + VERSION_IMPORT + '" , "' + DATE_IMPORT + '" , "' + parseInt(REGIME_CODE) + '" , "' + REGIME_DESCR + '" , "' +
-                    parseInt(CAISSE_GESTIONNAIRE_CODE) + '" , "' + CENTRE_GESTIONNAIRE_CODE + '" , "' + ORGANISME_LIBELLE + '" , "' + parseInt(ORGANISME_DEST_CODE) + '" , "' + CENTRE_INFO_CODE 
+                    SOURCE_IMPORT + '" , "' + VERSION_IMPORT + '" , "' + DATE_IMPORT + '" , "' + REGIME_CODE + '" , "' + REGIME_DESCR + '" , "' +
+                    CAISSE_GESTIONNAIRE_CODE + '" , "' + CENTRE_GESTIONNAIRE_CODE + '" , "' + ORGANISME_LIBELLE + '" , "' + ORGANISME_DEST_CODE + '" , "' + CENTRE_INFO_CODE 
                     + '" , "' + ADRESSE_1 + '" , "' + ADRESSE_2 + '" , "' + COMMUNE + '" , "' + CODE_POSTAL + '" , "' + CEDEX + '" , "' + TELEPHONE + '" , "' + FAX + '")';
                   
                     db.query(insertStatement,(err, results, fields) => {
@@ -278,8 +277,10 @@ function importExt(element, commentaire ){
 
 function updateUSD(){
   // Pour chaque enregistrement dans la table ext_organisme, nous vérifions s'il existe dans la table usd_organisme
-// S'il existe, nous mettons à jour les champs de l'enregistrement dans la table usd_organisme
-// S'il n'existe pas, nous le créons
+  // S'il existe, nous mettons à jour les champs de l'enregistrement dans la table usd_organisme
+  // S'il n'existe pas, nous le créons
+  // AUCUNE MODIFICATION SI "ID_EXT_ORGANISME" == null
+
 db.query("SELECT * FROM ext_organisme " ,(err, rows, fields)=> {
   if(err) throw err;
   rows.forEach(row => {
@@ -289,10 +290,11 @@ db.query("SELECT * FROM ext_organisme " ,(err, rows, fields)=> {
       var laDate = new Date();
       var date = laDate.getFullYear() +"-"+ parseInt(laDate.getMonth()+1) + "-" + laDate.getDate() + " " + laDate.getHours() + "-" + laDate.getMinutes() + "-" + laDate.getSeconds();
       
-      if(usd[0] != null && row["REGIME_CODE"] != null && row["ORGANISME_DEST_CODE"] != null){
+      if(usd[0] != null && usd[0]["ID_EXT_ORGANISME"] != null){
           
         //UPDATE des données de l'enregistrement dans la table usd_organisme
         let queryUpdateUsdExists = "UPDATE `usd_organisme` SET `CAISSE_GESTIONNAIRE_CODE` = '" + row["CAISSE_GESTIONNAIRE_CODE"] + "', " + 
+                                   "`ID_EXT_ORGANISME` = '" + row["ID"] + "', " +
                                    "`ORGANISME_LIBELLE` = '" + row["ORGANISME_LIBELLE"] + "', " + 
                                    "`CENTRE_INFO_CODE` = '" + row["CENTRE_INFO_CODE"] + "', " + 
                                    "`ISENABLE` = '" + 1 + "', " +
@@ -307,50 +309,34 @@ db.query("SELECT * FROM ext_organisme " ,(err, rows, fields)=> {
             
           db.query(queryUpdateUsdExists ,(err, results, fields)=> {
             if(err) throw err; 
+            console.log(results)
           });  
       }
-        else if(usd[0] != null && row["REGIME_CODE"] == null || row["ORGANISME_DEST_CODE"] == null){
-          
-            //UPDATE des données de l'enregistrement dans la table usd_organisme
-            let queryUpdateUsdExists = "UPDATE `usd_organisme` SET `CAISSE_GESTIONNAIRE_CODE` = '" + row["CAISSE_GESTIONNAIRE_CODE"] + "', " + 
-                                       "`ORGANISME_LIBELLE` = '" + row["ORGANISME_LIBELLE"] + "', " + 
-                                       "`CENTRE_INFO_CODE` = '" + row["CENTRE_INFO_CODE"] + "', " + 
-                                       "`ISENABLE` = '" + 0 + "', " +
-                                       "`ISACTIVE` = '" + 0 + "', ";
-           if( row["ORGANISME_LIBELLE"] == "Version de la table") {queryUpdateUsdExists += "`REGIME_CODE` = '" + row["REGIME_CODE"] + "', ";}
-                
-           queryUpdateUsdExists += "`UPDATEDDATE` = '" + date + "' WHERE `REGIME_CODE` = '" + row["REGIME_CODE"] +"'" +
-                                       "AND `ORGANISME_DEST_CODE` = '" + row["ORGANISME_DEST_CODE"] + "'" + 
-                                       "AND `CENTRE_GESTIONNAIRE_CODE` = '" + row["CENTRE_GESTIONNAIRE_CODE"] + "'";
-    
-                
-                
-              db.query(queryUpdateUsdExists ,(err, results, fields)=> {
-                if(err) throw err; 
-              });  
-          }
-        else{
+        else if(usd[0] == null){
           
           //INSERT de l'enregistrement dans la table usd_organisme
-          var COLUMNS_USD = [`ID_WRK_ADRESSE`, `ID_TS_TYPE_ORGANISME`, `REGIME_CODE`, `CAISSE_GESTIONNAIRE_CODE`,
+          var COLUMNS_USD = [`ID_EXT_ORGANISME`, `ID_WRK_ADRESSE`, `ID_TS_TYPE_ORGANISME`, `REGIME_CODE`, `CAISSE_GESTIONNAIRE_CODE`,
                             `CENTRE_GESTIONNAIRE_CODE`, `ORGANISME_LIBELLE`, `ORGANISME_DEST_CODE`, 
                             `CENTRE_INFO_CODE`, `CREATEDDATE`, `ISACTIVE`, `ISENABLE`];
           
           
-          var VALUES = [`1`, `91`, "'" + row["REGIME_CODE"] + "'", "'" + row["CAISSE_GESTIONNAIRE_CODE"] + "'" , 
+          var VALUES = ["'" + row["ID"] + "'",`1`, `91`, "'" + row["REGIME_CODE"] + "'", "'" + row["CAISSE_GESTIONNAIRE_CODE"] + "'" , 
                         "'" + row["CENTRE_GESTIONNAIRE_CODE"] + "'", "'" + row["ORGANISME_LIBELLE"] + "'", 
                         "'" + row["ORGANISME_DEST_CODE"] + "'" , "'" + row["CENTRE_INFO_CODE"]+"'", "'" + date + "'",
                         "'" + 1 + "'",  "'" + 1 + "'"];
+          if( row["ORGANISME_LIBELLE"] == "Version de la table") {VALUES[0] = "null";}
+          
           queryInsertUsd = 'INSERT INTO `usd_organisme` (' + COLUMNS_USD + ') VALUES (' + VALUES + ')';
           
             
           db.query(queryInsertUsd ,(err, results, fields)=> {
             if(err) throw err;
+            console.log(results)
             
           });
           
         }
-
+      
     });
 
   });
@@ -366,7 +352,7 @@ db.query("SELECT * FROM ext_organisme " ,(err, rows, fields)=> {
     
     db.query("SELECT * FROM ext_organisme WHERE REGIME_CODE = '" + row["REGIME_CODE"] +"' AND ORGANISME_DEST_CODE = '" + row["ORGANISME_DEST_CODE"] + "' AND CENTRE_GESTIONNAIRE_CODE = '" + row["CENTRE_GESTIONNAIRE_CODE"] + "'" ,(err, ext, fields)=> {
       if(err) throw err;
-      if(typeof ext[0] == "undefined"){
+      if(typeof ext[0] == "undefined" && row["ID_EXT_ORGANISME"] != null){
         
        var laDate = new Date();
        var date = laDate.getFullYear() +"-"+ parseInt(laDate.getMonth()+1) + "-" + laDate.getDate() + " " + laDate.getHours() + "-" + laDate.getMinutes() + "-" + laDate.getSeconds();
@@ -377,6 +363,7 @@ db.query("SELECT * FROM ext_organisme " ,(err, rows, fields)=> {
         
         db.query(queryUpdateUsdNoExists ,(err, results, fields)=> {
           if(err) throw err; 
+          console.log(results)
         });
       } 
      
@@ -386,5 +373,52 @@ db.query("SELECT * FROM ext_organisme " ,(err, rows, fields)=> {
   });
 
   });
+}
+
+function format(chain, length){
+  if(typeof chain != 'string' ){
+    chain = parseString(chain);
+  }
+  var chainReturn = "";
+  switch(length){
+    case 2:
+      if(chain.length == 1){
+        chainReturn.concat("0", chain);
+        return chainReturn;
+      }else{
+        return chain;
+      }
+    case 3:
+      
+      switch(chain.length){
+        case 1 :
+          chainReturn.concat("00", chain);
+          break;
+        case 2 :
+          chainReturn.concat("0", chain);
+          break;
+        case 3 :
+          return chain;
+      }
+      return chainReturn;
+
+    case 4:
+      switch(chain.length){
+        case 1 :
+          chainReturn.concat("000", chain);
+          break;
+        case 2 :
+          chainReturn.concat("00", chain);
+          break;
+        case 3 :
+          chainReturn.concat("0", chain);
+          break;
+        case 4 :
+          return chain;
+      }
+      
+      return chainReturn;
+
+  }
 }
 
