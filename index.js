@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 var db = mysql.createConnection({
   host : 'localhost',
-  database : 'tsxcare_export_prod_22_02_07',
+  database : 'bddtsxcare',
   user : 'root',
   password : ''
 })
